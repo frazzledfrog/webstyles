@@ -1,4 +1,4 @@
-// ILMC dashboard: synthetic data, charts, date range picker, database explorer.
+// Metrics dashboard: synthetic data, charts, date range picker, database explorer.
 // No dependencies. All data is generated deterministically from (database, day, hour)
 // so every panel agrees for any range; swap `Data` for real fetches in a project.
 
@@ -80,7 +80,7 @@
   const DBS = [
     {
       id: "prod-main", engine: "postgres 16", status: "ok", statusText: "online", meta: "12 ms · 38 conns",
-      seed: 11, base: 48000, userRatio: 0.092, lat: 190, err: 0.38, peak: 15,
+      seed: 11, base: 48000, userRatio: 0.092, lat: 190, err: 0.38, peak: 15, conns: 38, cache: 97.2,
       regions: [["AU-East", 0.34], ["US-West", 0.22], ["EU-Central", 0.18], ["JP-Tokyo", 0.12], ["US-East", 0.09], ["SG", 0.05]],
       tables: [
         { name: "users", rows: 420, cols: [["id", "id"], ["email", "email"], ["plan", "enum", ["free", "pro", "team"]], ["country", "enum", COUNTRIES], ["created_at", "ts"]] },
@@ -91,7 +91,7 @@
     },
     {
       id: "analytics-replica", engine: "clickhouse", status: "warn", statusText: "lagging", meta: "replication lag 4.2 s",
-      seed: 23, base: 162000, userRatio: 0.071, lat: 340, err: 0.21, peak: 13,
+      seed: 23, base: 162000, userRatio: 0.071, lat: 340, err: 0.21, peak: 13, conns: 64, cache: 88.5,
       regions: [["US-West", 0.29], ["AU-East", 0.24], ["EU-Central", 0.21], ["US-East", 0.13], ["JP-Tokyo", 0.08], ["SG", 0.05]],
       tables: [
         { name: "pageviews", rows: 900, cols: [["id", "id"], ["path", "text", ["/", "/pricing", "/blog/launch", "/docs", "/changelog"]], ["referrer", "enum", ["direct", "search", "soundcloud", "instagram", "newsletter"]], ["country", "enum", COUNTRIES], ["ts", "ts"]] },
@@ -101,7 +101,7 @@
     },
     {
       id: "studio.sqlite", engine: "sqlite 3", status: "ok", statusText: "local", meta: "local file · 84 MB",
-      seed: 37, base: 2100, userRatio: 0.004, lat: 24, err: 0.9, peak: 2,
+      seed: 37, base: 2100, userRatio: 0.004, lat: 24, err: 0.9, peak: 2, conns: 2, cache: 99.1,
       regions: [["localhost", 0.81], ["LAN", 0.13], ["USB audio", 0.06]],
       tables: [
         { name: "tracks", rows: 160, cols: [["id", "id"], ["title", "text", ["untitled_final_v7", "bass idea 04", "sidechain test", "vox chop sketch", "rave_edit_MASTER", "4am loop", "supersaw thing"]], ["bpm", "int", [120, 178]], ["key", "enum", ["F min", "A min", "C# min", "G maj", "D maj"]], ["status", "enum", ["demo", "demo", "mixing", "mastered"]], ["created_at", "ts"]] },
@@ -140,7 +140,9 @@
       const load = requests / (db.base * trend);
       const latency = db.lat * (0.78 + 0.3 * load + 0.12 * hash(db.seed, d, 3)) * (spike(db, d) ? 1.35 : 1);
       const errors = db.err * (0.7 + 0.6 * hash(db.seed, d, 4)) + (spike(db, d) ? db.err * 2.2 : 0);
-      return { requests, users, latency, errors };
+      const conns = db.conns * (0.7 + 0.3 * load) * (0.92 + 0.16 * hash(db.seed, d, 9));
+      const cacheHit = Math.min(99.9, db.cache - (load - 1) * 3 - 2 * hash(db.seed, d, 10));
+      return { requests, users, latency, errors, conns, cache: cacheHit };
     }
     function hour(db, d, hr) {
       const base = day(db, d);
@@ -151,6 +153,8 @@
         users: base.users / 24 * c * (0.9 + 0.2 * hash(db.seed, d, hr, 6)),
         latency: base.latency * (0.85 + 0.2 * c * n),
         errors: base.errors * (0.75 + 0.5 * hash(db.seed, d, hr, 7)),
+        conns: base.conns * (0.6 + 0.5 * c / 1.5) * (0.9 + 0.2 * n),
+        cache: Math.min(99.9, base.cache - (c - 1) * 1.5),
       };
     }
 
@@ -168,13 +172,14 @@
     }
 
     function totals(db, start, end) {
-      let req = 0, users = 0, lat = 0, err = 0;
+      let req = 0, users = 0, lat = 0, err = 0, conns = 0, hit = 0;
       for (let d = start; d <= end; d++) {
         const v = day(db, d);
         req += v.requests; users += v.users; lat += v.latency * v.requests; err += v.errors * v.requests;
+        conns += v.conns; hit += v.cache * v.requests;
       }
       const n = end - start + 1;
-      return { requests: req, users: users / n, latency: lat / req, errors: err / req };
+      return { requests: req, users: users / n, latency: lat / req, errors: err / req, conns: conns / n, cache: hit / req };
     }
 
     function regions(db, start, end) {
@@ -272,6 +277,8 @@
     { id: "users", label: "users", title: "Active users / day", fmt: (v) => nfCompact.format(v), better: "up" },
     { id: "latency", label: "p95", title: "p95 latency", fmt: (v) => Math.round(v) + " ms", better: "down" },
     { id: "errors", label: "errors", title: "Error rate", fmt: (v) => v.toFixed(2) + "%", better: "down" },
+    { id: "conns", label: "conns", title: "Open connections", fmt: (v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))), better: "none" },
+    { id: "cache", label: "cache", title: "Cache hit rate", fmt: (v) => v.toFixed(1) + "%", better: "up" },
   ];
 
   const state = {
@@ -282,16 +289,16 @@
     compare: true,
     metric: "requests",
     tableView: false,
-    ex: { table: "orders", search: "", fcol: "", fval: "", sort: null, dir: -1, page: 0, size: 25 },
+    ex: { table: "orders", search: "", fcol: "", fval: "", sort: null, dir: -1, page: 0, size: 50 },
   };
   try {
-    const saved = JSON.parse(localStorage.getItem("ilmc-state") || "null");
+    const saved = JSON.parse(localStorage.getItem("metrics-dash-state") || "null");
     if (saved && dbById(saved.db)) Object.assign(state, { db: saved.db, preset: saved.preset, metric: saved.metric });
     const p = PRESETS.find((x) => x.id === state.preset);
     if (p) [state.start, state.end] = p.range(); else state.preset = "30d";
   } catch { /* storage unavailable: defaults are fine */ }
   function persist() {
-    try { localStorage.setItem("ilmc-state", JSON.stringify({ db: state.db, preset: state.preset, metric: state.metric })); } catch { /* ignore */ }
+    try { localStorage.setItem("metrics-dash-state", JSON.stringify({ db: state.db, preset: state.preset, metric: state.metric })); } catch { /* ignore */ }
   }
 
   const rangeDays = () => state.end - state.start + 1;
@@ -337,13 +344,13 @@
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", class: "spark", "aria-hidden": "true" });
     const d = values.map((v, i) => (i ? "L" : "M") + sx(i).toFixed(1) + " " + sy(v).toFixed(1)).join("");
     el("path", { d: d + `L${W} ${H}L0 ${H}Z`, fill: color, "fill-opacity": 0.12 }, svg);
-    el("path", { d, class: "line-glow", fill: "none", stroke: color, "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }, svg);
+    el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }, svg);
     container.appendChild(svg);
   }
 
   function lineChart(container, cur, prev, metric) {
     container.replaceChildren();
-    const W = Math.max(280, container.clientWidth), H = W < 500 ? 220 : 270;
+    const W = Math.max(280, container.clientWidth), H = Math.round(Math.min(460, Math.max(220, W * 0.36)));
     const m = { l: 46, r: 58, t: 12, b: 28 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
     const vals = cur.map((b) => b[metric.id]);
@@ -368,7 +375,7 @@
     const path = (arr) => arr.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join("");
     el("path", { d: path(vals) + `L${x(n - 1)} ${y(0)}L${x(0)} ${y(0)}Z`, fill: "var(--s1)", "fill-opacity": 0.08 }, svg);
     if (prev) el("path", { d: path(pvals), fill: "none", stroke: "var(--s-prev)", "stroke-width": 2, "stroke-dasharray": "5 4", "stroke-linejoin": "round" }, svg);
-    el("path", { d: path(vals), class: "line-glow", fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    el("path", { d: path(vals), fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
 
     // Direct label on the current series' last point.
     el("circle", { cx: x(n - 1), cy: y(vals[n - 1]), r: 4, fill: "var(--s1)", class: "dot" }, svg);
@@ -412,7 +419,10 @@
   function barChart(container, data) {
     container.replaceChildren();
     const W = Math.max(240, container.clientWidth);
-    const rowH = 30, bh = 14, labelW = 92, valW = 56;
+    // Rows grow so the bars fill roughly the height of the time series beside them.
+    const ts = $("#ts-chart svg");
+    const target = Math.max(200, Math.min(420, ts && !$("#ts-chart").hidden ? ts.getBoundingClientRect().height : 300));
+    const rowH = Math.round(Math.max(32, Math.min(64, target / data.length))), bh = Math.min(22, Math.round(rowH * 0.45)), labelW = 92, valW = 56;
     const H = data.length * rowH + 4;
     const max = Math.max(...data.map((d) => d.value));
     const total = data.reduce((a, d) => a + d.value, 0);
@@ -424,12 +434,9 @@
       const w = Math.max(2, (d.value / max) * iw);
       const g = el("g", {}, svg);
       el("text", { x: labelW - 10, y: y0 + bh - 3, "text-anchor": "end", class: "label" }, g).textContent = d.name;
-      // Segmented bar: 6px cells with 2px surface gaps, last cell trimmed to the exact value.
-      const bar = el("g", { class: "mark" }, g);
-      for (let cx = 0; cx < w; cx += 8) {
-        el("rect", { class: "cell", x: labelW + 2 + cx, y: y0, width: Math.max(1, Math.min(6, w - cx)), height: bh, fill: "var(--s1)" }, bar);
-      }
-      el("text", { x: labelW + w + 8, y: y0 + bh - 3, class: "value-label" }, g).textContent = nfCompact.format(d.value);
+      const r = Math.min(2, w / 2);
+      const bar = el("path", { class: "mark", fill: "var(--s1)", d: `M${labelW} ${y0}h${w - r}a${r} ${r} 0 0 1 ${r} ${r}v${bh - 2 * r}a${r} ${r} 0 0 1 -${r} ${r}h-${w - r}z` }, g);
+      el("text", { x: labelW + w + 6, y: y0 + bh - 3, class: "value-label" }, g).textContent = nfCompact.format(d.value);
       const hit = el("rect", { x: 0, y: i * rowH, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": `${d.name}: ${nfInt.format(Math.round(d.value))} requests` }, g);
       const on = (e) => {
         bar.classList.add("hover");
@@ -444,7 +451,7 @@
   const MIX_COLORS = { SELECT: "var(--s1)", INSERT: "var(--s2)", UPDATE: "var(--s3)", DELETE: "var(--s4)" };
   function stackedChart(container, data) {
     container.replaceChildren();
-    const W = Math.max(240, container.clientWidth), H = 210;
+    const W = Math.max(240, container.clientWidth), H = Math.round(Math.min(340, Math.max(200, W * 0.55)));
     const m = { l: 40, r: 6, t: 8, b: 24 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
     const totals = data.map((d) => d.values.reduce((a, v) => a + v.value, 0));
@@ -491,12 +498,12 @@
   function heatmap(container, grid) {
     container.replaceChildren();
     const W = Math.max(240, container.clientWidth);
-    const lw = 34, gap = 2, cw = (W - lw) / 24, ch = 18;
+    const lw = 34, gap = 2, cw = (W - lw) / 24, ch = Math.max(14, Math.min(36, cw * 1.5));
     const H = 7 * (ch + gap) + 18;
     const flat = grid.flat().filter((v) => v != null);
     const min = Math.min(...flat), max = Math.max(...flat);
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Average requests by weekday and hour" }, container);
-    const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     grid.forEach((row, ri) => {
       el("text", { x: 0, y: ri * (ch + gap) + ch - 5, class: "axis" }, svg).textContent = DAYS[ri];
       row.forEach((v, hr) => {
@@ -543,22 +550,22 @@
   function renderKpis() {
     const box = $("#kpis");
     box.replaceChildren();
-    METRICS.forEach((m, i) => {
+    METRICS.forEach((m) => {
       const v = cache.tot[m.id], pv = cache.ptot[m.id];
       const pct = ((v - pv) / pv) * 100;
-      const good = (pct >= 0) === (m.better === "up");
-      const tile = h("div", { class: "win kpi" },
-        h("span", { class: "label" }, h("span", { text: m.title }), h("span", { text: "k-0" + (i + 1) })),
+      const tone = m.better === "none" ? "flat" : (pct >= 0) === (m.better === "up") ? "good" : "bad";
+      const tile = h("div", { class: "kpi" },
+        h("span", { class: "label", text: m.title }),
         h("span", { class: "value", text: m.fmt(v) }),
         state.compare
-          ? h("span", { class: "delta" }, h("b", { class: good ? "good" : "bad", text: (pct >= 0 ? "▲ " : "▼ ") + Math.abs(pct).toFixed(1) + "%" }), " vs previous")
+          ? h("span", { class: "delta" }, h("b", { class: tone, text: (pct >= 0 ? "▲ " : "▼ ") + Math.abs(pct).toFixed(1) + "%" }), " vs previous")
           : h("span", { class: "delta", text: "comparison off" }));
       box.appendChild(tile);
       const spark = h("div");
       tile.appendChild(spark);
       sparkline(spark, cache.cur.map((b) => b[m.id]), "var(--s1)");
       spark.firstChild.style.width = "100%";
-      spark.firstChild.style.height = "32px";
+      spark.firstChild.style.height = "28px";
     });
   }
 
@@ -575,13 +582,13 @@
 
   function renderTimeseries() {
     const m = METRICS.find((x) => x.id === state.metric);
-    $("#ts-title").textContent = m.id + ".over_time";
+    $("#ts-title").textContent = m.title + " over time";
     const legend = $("#ts-legend");
     legend.replaceChildren();
     const key = (cls, color, text) => { const k = h("i", { class: cls }); k.style.borderColor = color; return h("span", {}, k, text); };
     legend.append(key("key-line", "var(--s1)", "This period"));
     if (state.compare) legend.append(key("key-line dashed", "var(--s-prev)", "Previous period"));
-    legend.append(h("span", { class: "mono", text: cache.cur.length > 48 || rangeDays() > 2 ? "daily" : "hourly" }));
+    legend.append(h("span", { text: rangeDays() > 2 ? "Daily" : "Hourly" }));
 
     const chart = $("#ts-chart"), table = $("#ts-table");
     chart.hidden = state.tableView; table.hidden = !state.tableView;
@@ -729,15 +736,21 @@
     const body = h("tbody");
     if (!slice.length) body.append(h("tr", { class: "empty" }, h("td", { colspan: t.cols.length, text: "no rows match in this date range" })));
     for (const r of slice) {
-      const tr = h("tr", { tabindex: 0, "aria-label": `Open ${t.name} row ${r[t.cols[0][0]]}` });
+      const id = r[t.cols[0][0]];
+      const tr = h("tr", { tabindex: 0, "aria-selected": String(id === ex.selected), "aria-label": `Open ${t.name} row ${id}` });
       for (const [k, type] of t.cols) {
         const td = h("td", { class: (numeric(type) ? "num " : "") + (type === "id" || type === "ts" || type === "email" ? "mono" : "") });
         if (type === "enum") td.append(h("span", { class: "pill", text: String(r[k]) }));
         else td.textContent = fmtCell(type, r[k]);
         tr.append(td);
       }
-      tr.addEventListener("click", () => inspect(t, r));
-      tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inspect(t, r); } });
+      const open = () => {
+        ex.selected = id;
+        table.querySelectorAll("tbody tr").forEach((x) => x.setAttribute("aria-selected", String(x === tr)));
+        inspect(t, r, true);
+      };
+      tr.addEventListener("click", open);
+      tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
       body.append(tr);
     }
     table.replaceChildren(h("thead", {}, head), body);
@@ -746,24 +759,44 @@
     $("#ex-info").textContent = `${from}–${ex.page * ex.size + slice.length} of ${nfInt.format(rows.length)} rows in range · page ${ex.page + 1}/${pages}`;
     $("#ex-prev").disabled = ex.page === 0;
     $("#ex-next").disabled = ex.page >= pages - 1;
+
+    // The docked inspector always shows a row: the selected one if visible, else the first.
+    const sel = slice.find((r) => r[t.cols[0][0]] === ex.selected) || slice[0];
+    if (sel) {
+      if (!slice.some((r) => r[t.cols[0][0]] === ex.selected)) {
+        ex.selected = sel[t.cols[0][0]];
+        const first = table.querySelector("tbody tr");
+        if (first) first.setAttribute("aria-selected", "true");
+      }
+      inspect(t, sel, false);
+    } else {
+      $("#ex-detail").replaceChildren(h("h3", { text: "No row selected" }));
+    }
   }
 
   const dlg = $("#inspector");
-  let inspected = null;
-  function inspect(t, r) {
+  const docked = matchMedia("(min-width: 1400px)");
+  function detailNodes(t, r) {
     const obj = {};
     for (const [k, type] of t.cols) obj[k] = type === "ts" ? new Date(r[k]).toISOString() : r[k];
-    inspected = obj;
-    $("#insp-title").textContent = `${t.name} #${r[t.cols[0][0]]}`;
-    const dl = $("#insp-fields");
-    dl.replaceChildren();
+    const json = JSON.stringify(obj, null, 2);
+    const dl = h("dl");
     for (const [k, type] of t.cols) dl.append(h("dt", { text: k }), h("dd", { text: fmtCell(type, r[k]) }));
-    $("#insp-json").textContent = JSON.stringify(obj, null, 2);
-    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    const copy = h("button", { class: "btn sm", type: "button", text: "Copy JSON", onclick: (e) => copyText(json, e.currentTarget) });
+    return h("div", { class: "detail" }, dl, h("div", { class: "detail-json" }, h("pre", { text: json }), copy));
+  }
+  // fromUser: a click or Enter on a row. Narrow screens open the drawer; wide screens update the docked pane.
+  function inspect(t, r, fromUser) {
+    const title = `${t.name} #${r[t.cols[0][0]]}`;
+    $("#ex-detail").replaceChildren(h("h3", { text: title }), detailNodes(t, r));
+    if (fromUser && !docked.matches) {
+      $("#insp-title").textContent = title;
+      $("#insp-body").replaceChildren(detailNodes(t, r));
+      if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    }
   }
   $("#insp-close").addEventListener("click", () => dlg.close());
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
-  $("#insp-copy").addEventListener("click", (e) => copyText(JSON.stringify(inspected, null, 2), e.currentTarget));
 
   /* ---------------------------------------------------------------------
      Connections & database select
@@ -774,11 +807,10 @@
     box.replaceChildren();
     sel.replaceChildren();
     for (const db of DBS) {
-      box.append(h("button", { type: "button", class: "conn", "aria-pressed": String(db.id === state.db), onclick: () => setDb(db.id) },
+      box.append(h("button", { type: "button", class: "conn", title: `${db.id} (${db.statusText})`, "aria-pressed": String(db.id === state.db), onclick: () => setDb(db.id) },
         h("span", { class: "led " + (db.status === "ok" ? "" : db.status), title: db.statusText }),
         h("span", { class: "name", text: db.id }),
-        h("span", { class: "engine", text: db.engine }),
-        h("span", { class: "meta", text: db.statusText + " · " + db.meta })));
+        h("span", { class: "meta", text: db.engine + " · " + db.statusText })));
       sel.append(h("option", { value: db.id, text: db.id }));
     }
     sel.value = state.db;
@@ -929,21 +961,8 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
-  function renderTicker() {
-    const t = cache.tot;
-    const bits = [
-      ["db", cache.db.id], ["range", isoDay(state.start) + ".." + isoDay(state.end)],
-      ["req", nfInt.format(Math.round(t.requests))], ["users/day", nfInt.format(Math.round(t.users))],
-      ["p95", Math.round(t.latency) + "ms"], ["err", t.errors.toFixed(2) + "%"],
-      ["status", cache.db.statusText], ["i love my computer", "<3"],
-    ];
-    const run = () => bits.map(([k, v]) => h("span", {}, k + " ", h("b", { text: v })));
-    $("#ticker").replaceChildren(...run(), ...run()); // doubled so the loop is seamless
-  }
-
   function renderAll() {
     compute();
-    renderTicker();
     renderHead(); renderKpis(); renderMetricTabs(); renderTimeseries();
     renderRegions(); renderMix(); renderHeat(); renderSlow();
     renderSchema(); renderExFilters(); renderExplorer();
@@ -967,6 +986,17 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (!cache) return; renderTimeseries(); renderRegions(); renderMix(); renderHeat(); }, 120);
   }).observe(content);
+
+  // Collapse the sidebar to an icon rail to give the dashboard more width.
+  const app = $("#app"), collapseBtn = $("#collapse");
+  function setRail(on) {
+    app.classList.toggle("rail", on);
+    collapseBtn.setAttribute("aria-pressed", String(on));
+    collapseBtn.title = on ? "Expand sidebar" : "Collapse sidebar";
+    try { localStorage.setItem("metrics-dash-rail", on ? "1" : "0"); } catch { /* ignore */ }
+  }
+  try { if (localStorage.getItem("metrics-dash-rail") === "1") setRail(true); } catch { /* ignore */ }
+  collapseBtn.addEventListener("click", () => setRail(!app.classList.contains("rail")));
 
   renderConnections();
   renderAll();
