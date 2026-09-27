@@ -17,7 +17,7 @@ pages/                     the templates
 |-----------|-----------------------------------------|
 | Marketing | landing, pricing, about, contact        |
 | Content   | blog, article, docs                     |
-| App       | dashboard, settings                     |
+| App       | dashboard, settings, ilmc-dashboard     |
 | Utility   | login, signup, 404                      |
 
 ## Using a template in another project
@@ -33,3 +33,12 @@ Header and footer markup is duplicated in each page on purpose so every file sta
 - Theme: follows the OS by default; the toggle stores an explicit choice in `localStorage` and sets `data-theme` on `<html>`.
 - Interactivity is declared with `data-action` attributes (`toggle-theme`, `toggle-nav`, `tab`, `segment`) and handled by one delegated listener in `main.js`.
 - Layout primitives take CSS custom properties for tuning inline, e.g. `style="--min:200px"` on `.grid` or `--stack:var(--sp-6)` on `.stack`.
+
+## ILMC dashboard
+
+`pages/ilmc-dashboard.html` is a standalone themed variant that does not use the shared tokens: it loads `assets/css/ilmc.css` and `assets/js/ilmc-dashboard.js` (plus `main.js` for the theme and nav toggles). It is a BIOS/HUD-style metrics dashboard named for Ninajirachi's *I Love My Computer*, with a light "paper" mode and a dark "phosphor" mode.
+
+- Date range picker: presets plus a two-month custom calendar (keyboard arrows move between days).
+- Database explorer: connection switcher, schema tree, search, enum filter, sortable columns, pagination, generated SQL preview and a row inspector.
+- Charts are hand-built SVG with hover and keyboard readouts; the time series has a table view. Categorical colours are validated for colour-vision deficiency in both modes.
+- All data is synthetic and deterministic (the `Data` module in the script). Replace it with real fetches; the render functions only take arrays.
