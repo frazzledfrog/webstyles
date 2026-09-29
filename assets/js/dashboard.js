@@ -6,6 +6,34 @@
   "use strict";
 
   const $ = (s, r = document) => r.querySelector(s);
+
+  /* ---------------------------------------------------------------------
+     Theme and sidebar toggles
+     --------------------------------------------------------------------- */
+
+  // Theme: an explicit choice wins, otherwise follow the OS.
+  const root = document.documentElement;
+  let storedTheme = null;
+  try { storedTheme = localStorage.getItem("theme"); } catch { /* storage unavailable */ }
+  root.dataset.theme = storedTheme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    if (btn.dataset.action === "toggle-theme") {
+      root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+      try { localStorage.setItem("theme", root.dataset.theme); } catch { /* ignore */ }
+    }
+    if (btn.dataset.action === "toggle-nav") {
+      const open = document.getElementById(btn.getAttribute("aria-controls")).classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    $("#sidebar").classList.remove("open");
+    document.querySelectorAll("[data-action=toggle-nav]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  });
   const SVG = "http://www.w3.org/2000/svg";
   const DAY = 864e5;
 

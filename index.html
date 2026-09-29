@@ -3,62 +3,218 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Web Templates</title>
-  <meta name="description" content="Index of reusable page templates.">
-  <link rel="stylesheet" href="assets/css/tokens.css">
-  <link rel="stylesheet" href="assets/css/base.css">
-  <link rel="stylesheet" href="assets/css/components.css">
-  <script src="assets/js/main.js" defer></script>
+  <title>Metrics &middot; Brand</title>
+  <meta name="description" content="Full-width metrics dashboard with a date range picker and database explorer.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="assets/css/dashboard.css">
+  <script src="assets/js/dashboard.js" defer></script>
 </head>
 <body>
-<main id="main" class="section">
-<div class="container stack" style="--stack:var(--sp-7)">
-  <header class="split">
-    <div class="stack" style="--stack:var(--sp-2)">
-      <p class="eyebrow">webstyles</p>
-      <h1>Page templates</h1>
-      <p class="lede">Plain HTML and CSS, no build step. Copy <code>assets/</code> and any page into a project, then edit <code>tokens.css</code> to rebrand.</p>
-    </div>
-    <button class="btn secondary theme-toggle" type="button" data-action="toggle-theme">
-      <svg class="moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-      <svg class="sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-      Theme
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="app" id="app">
+<aside class="sidebar" id="sidebar">
+  <a class="brand" href="#main"><span class="brand-mark" aria-hidden="true"></span><span class="txt">Brand<small>metrics</small></span></a>
+
+  <nav class="side-group" aria-label="Views">
+    <h2 class="txt">Views</h2>
+    <a class="side-link" href="#overview" aria-current="page" title="Overview">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span class="txt">Overview</span></a>
+    <a class="side-link" href="#explorer" title="Explorer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="txt">Explorer</span></a>
+    <a class="side-link" href="#slow" title="Slow queries">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span class="txt">Slow queries</span></a>
+    <a class="side-link" href="#radar" title="Radar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 18.5 5.5"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg><span class="txt">Radar</span></a>
+  </nav>
+
+  <div class="side-group">
+    <h2 class="txt">Connections</h2>
+    <div id="connections" class="side-group" role="group" aria-label="Database connection"></div>
+  </div>
+
+  <button class="side-collapse" type="button" id="collapse" aria-pressed="false" title="Collapse sidebar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="4" width="18" height="16"/><path d="M9 4v16M15 10l-2 2 2 2"/></svg><span class="txt">Collapse</span>
+  </button>
+</aside>
+
+<div class="main">
+  <div class="topbar" role="toolbar" aria-label="Filters">
+    <button class="btn icon sidebar-toggle" type="button" data-action="toggle-nav" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
-  </header>
-  <section class="stack" style="--stack:var(--sp-4)">
-    <h2>Marketing</h2>
-    <div class="grid" style="--min:260px">
-      <a class="card hover" href="pages/landing.html"><div class="placeholder" style="--ratio:16/9">Landing</div><h3>Landing</h3><p class="small muted">Hero, logo strip, feature grid, deep-dive, testimonials, CTA.</p></a>
-      <a class="card hover" href="pages/pricing.html"><div class="placeholder" style="--ratio:16/9">Pricing</div><h3>Pricing</h3><p class="small muted">Tier cards with monthly/yearly toggle, comparison table, FAQ.</p></a>
-      <a class="card hover" href="pages/about.html"><div class="placeholder" style="--ratio:16/9">About</div><h3>About</h3><p class="small muted">Mission, stats, story timeline, team grid, values.</p></a>
-      <a class="card hover" href="pages/contact.html"><div class="placeholder" style="--ratio:16/9">Contact</div><h3>Contact</h3><p class="small muted">Contact details beside a validated form.</p></a>
+
+    <div class="picker" id="picker">
+      <button class="btn" type="button" id="picker-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="picker-pop">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <span id="picker-label">Last 30 days</span><span class="caret" aria-hidden="true">&#9662;</span>
+      </button>
+      <div class="picker-pop" id="picker-pop" role="dialog" aria-label="Choose date range" hidden>
+        <div class="presets" id="presets" role="radiogroup" aria-label="Presets"></div>
+        <div class="cal-wrap">
+          <div class="cal-nav">
+            <button class="btn sm icon" type="button" id="cal-prev" aria-label="Previous month">&#8249;</button>
+            <span>Custom range</span>
+            <button class="btn sm icon" type="button" id="cal-next" aria-label="Next month">&#8250;</button>
+          </div>
+          <div class="cal-months" id="cal-months"></div>
+          <div class="cal-foot">
+            <span class="sel" id="cal-sel">Pick a start date</span>
+            <button class="btn sm" type="button" id="cal-cancel">Cancel</button>
+            <button class="btn sm primary" type="button" id="cal-apply" disabled>Apply</button>
+          </div>
+        </div>
+      </div>
     </div>
-  </section>
-  <section class="stack" style="--stack:var(--sp-4)">
-    <h2>Content</h2>
-    <div class="grid" style="--min:260px">
-      <a class="card hover" href="pages/blog.html"><div class="placeholder" style="--ratio:16/9">Blog index</div><h3>Blog index</h3><p class="small muted">Featured post, category tabs, card grid, pagination.</p></a>
-      <a class="card hover" href="pages/article.html"><div class="placeholder" style="--ratio:16/9">Article</div><h3>Article</h3><p class="small muted">Long-form .prose layout with author box.</p></a>
-      <a class="card hover" href="pages/docs.html"><div class="placeholder" style="--ratio:16/9">Docs</div><h3>Docs</h3><p class="small muted">Sidebar nav, content, sticky table of contents.</p></a>
-    </div>
-  </section>
-  <section class="stack" style="--stack:var(--sp-4)">
-    <h2>App</h2>
-    <div class="grid" style="--min:260px">
-      <a class="card hover" href="pages/dashboard.html"><div class="placeholder" style="--ratio:16/9">Dashboard</div><h3>Dashboard</h3><p class="small muted">KPI stats, CSS bar chart, activity timeline, data table.</p></a>
-      <a class="card hover" href="pages/metrics-dashboard.html"><div class="placeholder" style="--ratio:16/9">Metrics</div><h3>Metrics</h3><p class="small muted">Standalone full-width dashboard: date range picker, database explorer, SVG charts. Flat neon theme, light and dark.</p></a>
-      <a class="card hover" href="pages/settings.html"><div class="placeholder" style="--ratio:16/9">Settings</div><h3>Settings</h3><p class="small muted">Tabbed profile, notifications, billing, danger zone.</p></a>
-    </div>
-  </section>
-  <section class="stack" style="--stack:var(--sp-4)">
-    <h2>Utility</h2>
-    <div class="grid" style="--min:260px">
-      <a class="card hover" href="pages/login.html"><div class="placeholder" style="--ratio:16/9">Log in</div><h3>Log in</h3><p class="small muted">Centered auth card with SSO button.</p></a>
-      <a class="card hover" href="pages/signup.html"><div class="placeholder" style="--ratio:16/9">Sign up</div><h3>Sign up</h3><p class="small muted">Account creation form.</p></a>
-      <a class="card hover" href="pages/404.html"><div class="placeholder" style="--ratio:16/9">404</div><h3>404</h3><p class="small muted">Not-found error page.</p></a>
-    </div>
-  </section>
+
+    <label class="sr-only" for="db-select">Database</label>
+    <select class="field" id="db-select"></select>
+
+    <label class="check"><input type="checkbox" id="compare" checked> Compare to previous period</label>
+
+    <span class="spacer"></span>
+    <span class="updated" id="updated" aria-live="polite"></span>
+    <button class="btn icon" type="button" id="refresh" aria-label="Refresh data">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+    </button>
+    <button class="btn icon theme-toggle" type="button" data-action="toggle-theme" aria-label="Toggle dark mode">
+      <svg class="moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <button class="btn primary" type="button" id="export">Export CSV</button>
+  </div>
+
+  <main class="views" id="main">
+  <div class="dash" id="overview-view">
+    <header class="page-head" id="overview">
+      <h1 id="page-title">Overview</h1>
+      <p id="page-sub"></p>
+    </header>
+
+    <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+    <section class="panel p-ts">
+      <div class="panel-head">
+        <h2 id="ts-title">Requests over time</h2>
+        <div class="legend" id="ts-legend"></div>
+        <div class="tools">
+          <div class="segmented" id="metric-tabs" role="tablist" aria-label="Metric"></div>
+          <button class="btn sm" type="button" id="ts-view" aria-pressed="false">Table</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart" id="ts-chart"></div>
+        <div class="table-wrap" id="ts-table" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel p-region">
+      <div class="panel-head"><h2>Traffic by region</h2></div>
+      <div class="panel-body"><div class="chart" id="region-chart"></div></div>
+    </section>
+
+    <section class="panel p-mix">
+      <div class="panel-head"><h2>Query mix</h2><div class="legend" id="mix-legend"></div></div>
+      <div class="panel-body"><div class="chart" id="mix-chart"></div></div>
+    </section>
+
+    <section class="panel p-heat">
+      <div class="panel-head">
+        <h2>Load by hour</h2>
+        <div class="legend"><span>Low</span><span class="key-ramp" aria-hidden="true"></span><span>High</span><span id="heat-range"></span></div>
+      </div>
+      <div class="panel-body"><div class="chart" id="heat-chart"></div></div>
+    </section>
+
+    <section class="panel p-slow" id="slow">
+      <div class="panel-head"><h2>Slow queries</h2><span class="hint">over 1 s, slowest first</span></div>
+      <div class="panel-body flush"><ul class="log" id="slow-log"></ul></div>
+    </section>
+
+    <section class="panel p-explorer" id="explorer" aria-labelledby="ex-title">
+      <div class="panel-head">
+        <h2 id="ex-title">Explorer</h2>
+        <span class="hint" id="ex-db"></span>
+        <span class="badge">Read only</span>
+      </div>
+      <div class="explorer">
+        <div class="schema" id="schema" role="tablist" aria-label="Tables" aria-orientation="vertical"></div>
+        <div class="ex-main">
+          <div class="ex-tools">
+            <div class="search">
+              <label class="sr-only" for="ex-search">Search rows</label>
+              <input class="field" type="search" id="ex-search" placeholder="Search rows">
+            </div>
+            <label class="sr-only" for="ex-filter-col">Filter column</label>
+            <select class="field" id="ex-filter-col"></select>
+            <label class="sr-only" for="ex-filter-val">Filter value</label>
+            <select class="field" id="ex-filter-val"></select>
+            <label class="sr-only" for="ex-size">Rows per page</label>
+            <select class="field" id="ex-size"><option>25</option><option selected>50</option><option>100</option></select>
+          </div>
+          <div class="sql"><code id="ex-sql"></code><button class="btn sm" type="button" id="ex-copy">Copy</button></div>
+          <div class="table-wrap ex-table"><table class="data" id="ex-table"></table></div>
+          <div class="ex-foot">
+            <span class="info" id="ex-info"></span>
+            <button class="btn sm" type="button" id="ex-prev">&#8249; Prev</button>
+            <button class="btn sm" type="button" id="ex-next">Next &#8250;</button>
+          </div>
+        </div>
+        <aside class="ex-detail" id="ex-detail" aria-label="Selected row"></aside>
+      </div>
+    </section>
+  </div>
+
+  <div class="dash" id="radar-view" hidden>
+    <header class="page-head">
+      <h1>Radar</h1>
+      <p id="radar-sub"></p>
+      <div class="head-tools">
+        <div class="legend" id="radar-legend"></div>
+        <label class="check"><input type="checkbox" id="live" checked> Live</label>
+      </div>
+    </header>
+
+    <section class="kpis radar-kpis" id="radar-kpis" aria-label="Radar summary"></section>
+
+    <section class="panel p-scope">
+      <div class="panel-head">
+        <h2>Latency scope</h2>
+        <span class="hint">distance = p95 latency (log scale) &middot; bearing = region &middot; size = requests / min</span>
+      </div>
+      <div class="panel-body scope-body"><div class="chart" id="scope"></div></div>
+    </section>
+
+    <section class="panel p-contacts">
+      <div class="panel-head"><h2>Contacts</h2><span class="hint" id="contacts-hint"></span></div>
+      <div class="panel-body flush"><ol class="contacts" id="contacts"></ol></div>
+    </section>
+
+    <section class="panel p-signal">
+      <div class="panel-head"><h2>Signal by region</h2><span class="hint" id="signal-hint"></span></div>
+      <div class="panel-body"><div class="chart" id="signal"></div></div>
+    </section>
+
+    <section class="panel p-events">
+      <div class="panel-head"><h2>Contact log</h2><span class="hint" id="events-hint">live feed, newest first</span></div>
+      <div class="panel-body flush"><ul class="log events" id="events" aria-live="polite"></ul></div>
+    </section>
+  </div>
+  </main>
 </div>
-</main>
+</div>
+
+<dialog class="inspector" id="inspector" aria-labelledby="insp-title">
+  <div class="panel-head">
+    <h2 id="insp-title">Row</h2>
+    <div class="tools"><button class="btn sm icon" type="button" id="insp-close" aria-label="Close">&#10005;</button></div>
+  </div>
+  <div id="insp-body"></div>
+</dialog>
+
+<div class="tooltip" id="tooltip" role="status" hidden></div>
+<div class="toasts" id="toasts" aria-live="assertive"></div>
 </body>
 </html>
