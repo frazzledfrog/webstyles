@@ -42,4 +42,5 @@ Header and footer markup is duplicated in each page on purpose so every file sta
 - Date range picker: presets plus a two-month custom calendar (keyboard arrows move between days).
 - Database explorer: connection switcher, schema tree, search, enum filter, sortable columns, pagination, generated SQL preview and a row inspector.
 - Charts are hand-built SVG with hover and keyboard readouts; the time series has a table view. Categorical colours are validated for colour-vision deficiency in both themes.
+- Radar view (`#radar`): each service connected to the selected database is a blip on a latency scope. Bearing is its region, distance its p95 latency on a log scale with the SLO ring marked, and size its request rate. It comes with a contact list with SLO gauges, triangle unit columns per region, and a live mode that drifts latencies and logs SLO crossings.
 - All data is synthetic and deterministic (the `Data` module in the script). Replace it with real fetches; the render functions only take arrays.

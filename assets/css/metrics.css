@@ -208,7 +208,9 @@ svg { display: block; }
   align-content: start;
   transition: opacity 180ms linear;
 }
-.dash.is-loading { opacity: 0.5; pointer-events: none; }
+.views { min-width: 0; }
+.views.is-loading .dash { opacity: 0.5; pointer-events: none; }
+.dash[hidden] { display: none; }
 .dash > * { grid-column: 1 / -1; min-width: 0; }
 
 .page-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding-top: 4px; }
@@ -451,6 +453,71 @@ dialog.inspector::backdrop { background: rgb(0 0 0 / 0.5); }
 .log .dur { font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
 .log .when { grid-column: 2 / 4; font-size: var(--fs-2xs); color: var(--text-muted); }
 
+/* Radar view ----------------------------------------------------------- */
+
+.page-head .head-tools { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.radar-kpis .kpi { padding-bottom: 12px; }
+.radar-kpis .kpi .value.bad { color: var(--bad); }
+
+@media (min-width: 1180px) {
+  .p-scope { grid-column: span 7; grid-row: span 2; }
+  .p-contacts { grid-column: span 5; }
+  .p-signal { grid-column: span 5; }
+  .p-events { grid-column: span 12; }
+  /* Keep the right column level with the scope: the contact list scrolls. */
+  .p-contacts .panel-body { max-height: max(240px, calc(100vh - 560px)); overflow-y: auto; }
+}
+@media (min-width: 1700px) {
+  .p-scope { grid-column: span 6; }
+  .p-contacts { grid-column: span 6; }
+  .p-signal { grid-column: span 3; }
+  .p-events { grid-column: span 3; grid-row: auto; }
+}
+
+.scope-body { place-items: center; }
+#scope svg { max-width: 100%; }
+.scope-ring { fill: none; stroke: var(--line); }
+.scope-ring.slo { stroke: var(--bad); stroke-dasharray: 4 4; }
+.scope-breach { fill: var(--bad); fill-opacity: 0.06; }
+.scope-spoke { stroke: var(--line); }
+.scope-tick { stroke: var(--line-strong); }
+.scope-sweep { transform-box: view-box; animation: sweep var(--period, 6s) linear infinite; }
+.scope-sweep .edge { stroke: var(--accent); stroke-width: 1.5; }
+.scope-sweep .trail { fill: var(--accent); }
+.blip { transition: transform 900ms ease-in-out; cursor: pointer; }
+.blip .core { stroke: var(--surface); stroke-width: 2; }
+.blip .ping { fill: none; stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ping var(--period, 6s) linear infinite; }
+.blip:hover .core, .blip:focus .core, .blip.on .core { stroke: var(--text); }
+.blip:focus { outline: none; }
+.blip text { fill: var(--text); font-size: 10px; font-family: var(--font-ui); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.scope-dim .blip:not(.on) { opacity: 0.3; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+@keyframes ping { 0% { opacity: 0.9; transform: scale(1); } 12% { opacity: 0; transform: scale(3.2); } 100% { opacity: 0; transform: scale(3.2); } }
+
+.contacts { list-style: none; padding: 0; display: grid; }
+.contacts li {
+  display: grid; grid-template-columns: 8px minmax(0, 1fr) auto minmax(90px, 150px); align-items: center; gap: 2px 12px;
+  padding: 7px 14px; border-bottom: 1px solid var(--line); cursor: pointer;
+}
+.contacts li:last-child { border-bottom: 0; }
+.contacts li:hover, .contacts li.on { background: var(--surface-2); }
+.contacts li:focus-visible { outline: 1px solid var(--pop); outline-offset: -1px; }
+.contacts .who { min-width: 0; display: grid; }
+.contacts .who b { font-size: var(--fs-xs); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contacts .who span { font-size: var(--fs-2xs); color: var(--text-muted); }
+.contacts .kind { display: inline-block; width: 8px; height: 8px; margin-right: 6px; }
+.contacts .lat { display: grid; text-align: right; font-variant-numeric: tabular-nums; }
+.contacts .lat b { font-size: var(--fs-xs); font-weight: 700; }
+.contacts .lat span { font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+.gauge { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; height: 10px; }
+.gauge i { background: var(--surface-2); }
+.gauge i.fill { background: var(--accent); }
+.gauge i.over { background: var(--bad); }
+.gauge i:nth-child(10) { box-shadow: inset -1px 0 0 var(--bad); }
+
+.events li { transition: background 600ms; }
+.events li.fresh { background: var(--accent-soft); }
+
 /* Responsive ------------------------------------------------------------- */
 
 @media (max-width: 900px) {
@@ -478,6 +545,8 @@ dialog.inspector::backdrop { background: rgb(0 0 0 / 0.5); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi .value { font-size: 1.5rem; }
   .ex-table { height: auto; max-height: 520px; }
+  .contacts li { grid-template-columns: 8px minmax(0, 1fr) auto; }
+  .contacts .gauge { grid-column: 2 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

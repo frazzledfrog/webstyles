@@ -80,7 +80,7 @@
   const DBS = [
     {
       id: "prod-main", engine: "postgres 16", status: "ok", statusText: "online", meta: "12 ms · 38 conns",
-      seed: 11, base: 48000, userRatio: 0.092, lat: 190, err: 0.38, peak: 15, conns: 38, cache: 97.2,
+      seed: 11, base: 48000, userRatio: 0.092, lat: 190, err: 0.38, peak: 15, conns: 38, cache: 97.2, slo: 300,
       regions: [["AU-East", 0.34], ["US-West", 0.22], ["EU-Central", 0.18], ["JP-Tokyo", 0.12], ["US-East", 0.09], ["SG", 0.05]],
       tables: [
         { name: "users", rows: 420, cols: [["id", "id"], ["email", "email"], ["plan", "enum", ["free", "pro", "team"]], ["country", "enum", COUNTRIES], ["created_at", "ts"]] },
@@ -91,7 +91,7 @@
     },
     {
       id: "analytics-replica", engine: "clickhouse", status: "warn", statusText: "lagging", meta: "replication lag 4.2 s",
-      seed: 23, base: 162000, userRatio: 0.071, lat: 340, err: 0.21, peak: 13, conns: 64, cache: 88.5,
+      seed: 23, base: 162000, userRatio: 0.071, lat: 340, err: 0.21, peak: 13, conns: 64, cache: 88.5, slo: 800,
       regions: [["US-West", 0.29], ["AU-East", 0.24], ["EU-Central", 0.21], ["US-East", 0.13], ["JP-Tokyo", 0.08], ["SG", 0.05]],
       tables: [
         { name: "pageviews", rows: 900, cols: [["id", "id"], ["path", "text", ["/", "/pricing", "/blog/launch", "/docs", "/changelog"]], ["referrer", "enum", ["direct", "search", "soundcloud", "instagram", "newsletter"]], ["country", "enum", COUNTRIES], ["ts", "ts"]] },
@@ -101,7 +101,7 @@
     },
     {
       id: "studio.sqlite", engine: "sqlite 3", status: "ok", statusText: "local", meta: "local file · 84 MB",
-      seed: 37, base: 2100, userRatio: 0.004, lat: 24, err: 0.9, peak: 2, conns: 2, cache: 99.1,
+      seed: 37, base: 2100, userRatio: 0.004, lat: 24, err: 0.9, peak: 2, conns: 2, cache: 99.1, slo: 45,
       regions: [["localhost", 0.81], ["LAN", 0.13], ["USB audio", 0.06]],
       tables: [
         { name: "tracks", rows: 160, cols: [["id", "id"], ["title", "text", ["untitled_final_v7", "bass idea 04", "sidechain test", "vox chop sketch", "rave_edit_MASTER", "4am loop", "supersaw thing"]], ["bpm", "int", [120, 178]], ["key", "enum", ["F min", "A min", "C# min", "G maj", "D maj"]], ["status", "enum", ["demo", "demo", "mixing", "mastered"]], ["created_at", "ts"]] },
@@ -953,6 +953,14 @@
   $("#ex-copy").addEventListener("click", (e) => copyText($("#ex-sql").textContent, e.currentTarget));
 
   $("#export").addEventListener("click", () => {
+    if (!$("#radar-view").hidden) {
+      const rows = ["service,region,kind,p95_ms,req_per_min"].concat(radar.services.map((x) => [x.name, x.region, x.kind, x.lat.toFixed(1), x.rpm.toFixed(1)].join(",")));
+      const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+      const a = h("a", { href: url, download: `${state.db}_radar.csv` });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
     const lines = ["bucket,requests,users,p95_latency_ms,error_rate_pct"];
     for (const b of cache.cur) lines.push([new Date(b.t).toISOString(), Math.round(b.requests), Math.round(b.users), b.latency.toFixed(1), b.errors.toFixed(3)].join(","));
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
@@ -966,6 +974,7 @@
     renderHead(); renderKpis(); renderMetricTabs(); renderTimeseries();
     renderRegions(); renderMix(); renderHeat(); renderSlow();
     renderSchema(); renderExFilters(); renderExplorer();
+    renderRadar();
     const t = new Date();
     $("#updated").textContent = `updated ${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
   }
@@ -984,8 +993,334 @@
     if (w === lastW) return;
     lastW = w;
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (!cache) return; renderTimeseries(); renderRegions(); renderMix(); renderHeat(); }, 120);
+    resizeTimer = setTimeout(() => {
+      if (!cache) return;
+      if (!$("#radar-view").hidden) { renderScope(); renderSignal(); setFocus(radar.focus); return; }
+      renderTimeseries(); renderRegions(); renderMix(); renderHeat();
+    }, 120);
   }).observe(content);
+
+  /* ---------------------------------------------------------------------
+     Radar view: services as blips on a latency scope
+     --------------------------------------------------------------------- */
+
+  const KINDS = { api: "var(--s1)", web: "var(--s2)", worker: "var(--s3)", batch: "var(--s4)" };
+  const SERVICE_POOL = [["api-gateway", "api"], ["auth", "api"], ["search", "api"], ["web-ssr", "web"], ["cdn-edge", "web"], ["job-worker", "worker"], ["mailer", "worker"], ["etl-nightly", "batch"], ["report-cron", "batch"]];
+  const KIND_LAT = { api: 0.55, web: 0.85, worker: 1.35, batch: 2.4 };
+  const KIND_RPM = { api: 1, web: 0.8, worker: 0.3, batch: 0.08 };
+  const PERIOD = 6; // sweep seconds
+
+  const radar = { services: [], live: true, timer: null, events: [], focus: null, blips: new Map(), rows: new Map() };
+
+  function buildServices() {
+    const db = cache.db, n = rangeDays();
+    const loadLat = cache.tot.latency / db.lat; // range-level latency drift vs the database baseline
+    const rpmTotal = cache.tot.requests / (n * 1440);
+    const r = seeded(db.seed * 97 + 5);
+    const out = [];
+    db.regions.forEach(([region, share], ri) => {
+      const pool = SERVICE_POOL.slice().sort(() => r() - 0.5);
+      const count = 2 + Math.floor(r() * 2);
+      for (let k = 0; k < count; k++) {
+        const [name, kind] = pool[k];
+        const lat = db.slo * 0.62 * KIND_LAT[kind] * (0.8 + 0.12 * ri) * (0.7 + 0.6 * hash(db.seed, ri, k, state.start, 11)) * loadLat;
+        out.push({ id: region + "/" + name, name, kind, region, ri, base: lat, walk: 1, lat, weight: share * KIND_RPM[kind] * (0.6 + 0.8 * r()) });
+      }
+    });
+    const wsum = out.reduce((a, x) => a + x.weight, 0);
+    out.forEach((x) => (x.rpm = rpmTotal * x.weight / wsum));
+    return out;
+  }
+
+  const sloState = (svc) => { const q = svc.lat / cache.db.slo; return q > 1 ? ["bad", "over SLO"] : q > 0.8 ? ["warn", "near SLO"] : ["", "ok"]; };
+  const fmtMs = (v) => (v < 10 ? v.toFixed(1) : Math.round(v)) + " ms";
+
+  let scopeGeo = null;
+  function scopeScale() {
+    const slo = cache.db.slo, lo = slo / 16, hi = slo * 3, { R } = scopeGeo;
+    return (v) => (Math.log(Math.max(lo, Math.min(hi, v)) / lo) / Math.log(hi / lo)) * R;
+  }
+  function polar(a, rr) {
+    const { cx, cy } = scopeGeo, t = (a * Math.PI) / 180;
+    return [cx + rr * Math.sin(t), cy - rr * Math.cos(t)];
+  }
+
+  function renderScope() {
+    const box = $("#scope");
+    box.replaceChildren();
+    const W = box.clientWidth || 600;
+    const S = Math.round(Math.max(300, Math.min(W, innerHeight - 190, 820)));
+    scopeGeo = { S, cx: S / 2, cy: S / 2, R: S / 2 - 36 };
+    const { cx, cy, R } = scopeGeo, rad = scopeScale(), slo = cache.db.slo;
+    const svg = el("svg", { viewBox: `0 0 ${S} ${S}`, width: S, height: S, role: "img", "aria-label": `Latency scope: ${radar.services.length} services around ${cache.db.id}` }, box);
+    svg.style.setProperty("--period", PERIOD + "s");
+
+    // Breach zone beyond the SLO ring, then range rings.
+    const rs = rad(slo);
+    el("path", { class: "scope-breach", "fill-rule": "evenodd", d: `M${cx - R} ${cy}a${R} ${R} 0 1 0 ${2 * R} 0a${R} ${R} 0 1 0 ${-2 * R} 0zM${cx - rs} ${cy}a${rs} ${rs} 0 1 1 ${2 * rs} 0a${rs} ${rs} 0 1 1 ${-2 * rs} 0z` }, svg);
+    [1 / 8, 1 / 4, 1 / 2, 1, 2].forEach((f) => {
+      const v = slo * f, rr = rad(v);
+      el("circle", { cx, cy, r: rr, class: "scope-ring" + (f === 1 ? " slo" : "") }, svg);
+      el("text", { x: cx + 4, y: cy - rr - 3, class: "axis" }, svg).textContent = f === 1 ? `SLO ${fmtMs(v)}` : fmtMs(v);
+    });
+    el("circle", { cx, cy, r: R, class: "scope-ring" }, svg);
+
+    // Bearing ticks every 5°, longer every 30°.
+    for (let a = 0; a < 360; a += 5) {
+      const [x1, y1] = polar(a, R), [x2, y2] = polar(a, R + (a % 30 ? 4 : 9));
+      el("line", { x1, y1, x2, y2, class: "scope-tick" }, svg);
+    }
+
+    // Region sectors: spokes and labels.
+    const regions = cache.db.regions.map(([name]) => name), sw = 360 / regions.length;
+    regions.forEach((name, i) => {
+      const [x, y] = polar(i * sw, R);
+      el("line", { x1: cx, y1: cy, x2: x, y2: y, class: "scope-spoke" }, svg);
+      const mid = i * sw + sw / 2, [lx, ly] = polar(mid, R + 22);
+      const t = el("text", { x: lx, y: ly + 3, "text-anchor": "middle", class: "label" }, svg);
+      t.textContent = name;
+    });
+
+    // Sweep: a leading edge with a fading trail, rotating around the centre.
+    const sweep = el("g", { class: "scope-sweep", "aria-hidden": "true" }, svg);
+    sweep.style.transformOrigin = `${cx}px ${cy}px`;
+    for (let k = 0; k < 10; k++) {
+      const a0 = -(k + 1) * 4, a1 = -k * 4;
+      const [x0, y0] = polar(a0, R), [x1, y1] = polar(a1, R);
+      el("path", { class: "trail", "fill-opacity": (0.16 * (1 - k / 10)).toFixed(3), d: `M${cx} ${cy}L${x0} ${y0}A${R} ${R} 0 0 1 ${x1} ${y1}Z` }, sweep);
+    }
+    const [ex, ey] = polar(0, R);
+    el("line", { x1: cx, y1: cy, x2: ex, y2: ey, class: "edge" }, sweep);
+
+    // Blips.
+    radar.blips.clear();
+    const layer = el("g", {}, svg);
+    const maxRpm = Math.max(...radar.services.map((x) => x.rpm));
+    const labelled = new Set(radar.services.slice().sort((a, b) => b.rpm - a.rpm).slice(0, 3).map((x) => x.id));
+    const perRegion = {};
+    radar.services.forEach((x) => (perRegion[x.ri] = (perRegion[x.ri] || 0) + 1));
+    const seen = {};
+    radar.services.forEach((svc) => {
+      const j = (seen[svc.ri] = (seen[svc.ri] || 0) + 1);
+      svc.angle = svc.ri * sw + (j * sw) / (perRegion[svc.ri] + 1);
+      const size = 4 + Math.sqrt(svc.rpm / maxRpm) * 10;
+      const g = el("g", { class: "blip", tabindex: 0, role: "button", "aria-label": `${svc.name} in ${svc.region}` }, layer);
+      const ping = el("circle", { r: size, class: "ping", stroke: KINDS[svc.kind] }, g);
+      ping.style.animationDelay = ((svc.angle / 360) * PERIOD).toFixed(2) + "s";
+      el("circle", { r: size, class: "core", fill: KINDS[svc.kind] }, g);
+      const label = el("text", { x: size + 4, y: 3.5 }, g);
+      const show = () => labelled.has(svc.id) || sloState(svc)[0] === "bad";
+      label.textContent = svc.name;
+      const tip = (e) => {
+        const [st, stText] = sloState(svc);
+        const [ax, ay] = e && e.clientX != null ? [e.clientX, e.clientY] : anchorOf(g);
+        showTip(ax, ay, `${svc.name} · ${svc.region}`, [
+          { color: KINDS[svc.kind], value: fmtMs(svc.lat), label: "p95 · " + stText },
+          { value: nfCompact.format(svc.rpm), label: "req / min" },
+          { value: svc.kind, label: "kind" },
+        ]);
+        setFocus(svc.id);
+      };
+      g.addEventListener("pointermove", tip);
+      g.addEventListener("focus", () => tip());
+      g.addEventListener("pointerleave", () => { hideTip(); setFocus(null); });
+      g.addEventListener("blur", () => { hideTip(); setFocus(null); });
+      radar.blips.set(svc.id, { g, label, show });
+    });
+    placeBlips();
+  }
+
+  function placeBlips() {
+    const rad = scopeScale();
+    for (const svc of radar.services) {
+      const b = radar.blips.get(svc.id);
+      if (!b) continue;
+      const [x, y] = polar(svc.angle, rad(svc.lat));
+      b.g.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      b.label.style.display = b.show() ? "" : "none";
+    }
+  }
+
+  function setFocus(id) {
+    radar.focus = id;
+    $("#scope").classList.toggle("scope-dim", !!id);
+    radar.blips.forEach((b, k) => b.g.classList.toggle("on", k === id));
+    radar.rows.forEach((row, k) => row.li.classList.toggle("on", k === id));
+  }
+
+  function renderContacts() {
+    const list = $("#contacts");
+    list.replaceChildren();
+    radar.rows.clear();
+    for (const svc of radar.services) {
+      const led = h("span", { class: "led" });
+      const ms = h("b"), stTxt = h("span");
+      const lat = h("span", { class: "lat" }, ms, stTxt);
+      const meta = h("span");
+      const gauge = h("span", { class: "gauge", "aria-hidden": "true" }, ...Array.from({ length: 12 }, () => h("i")));
+      const key = h("i", { class: "kind" });
+      key.style.background = KINDS[svc.kind];
+      const li = h("li", { tabindex: 0 }, led, h("span", { class: "who" }, h("b", {}, key, svc.name), meta), lat, gauge);
+      li.addEventListener("pointerenter", () => setFocus(svc.id));
+      li.addEventListener("pointerleave", () => setFocus(null));
+      li.addEventListener("focus", () => setFocus(svc.id));
+      li.addEventListener("blur", () => setFocus(null));
+      radar.rows.set(svc.id, { li, led, ms, stTxt, meta, gauge });
+      list.append(li);
+    }
+    updateContacts();
+  }
+
+  function updateContacts() {
+    const slo = cache.db.slo;
+    const sorted = radar.services.slice().sort((a, b) => b.lat / slo - a.lat / slo);
+    const list = $("#contacts");
+    sorted.forEach((svc) => {
+      const row = radar.rows.get(svc.id);
+      const [st, stText] = sloState(svc);
+      row.led.className = "led " + st;
+      row.led.title = stText;
+      row.ms.textContent = fmtMs(svc.lat);
+      row.stTxt.textContent = stText;
+      row.meta.textContent = `${svc.region} · ${svc.kind} · ${nfCompact.format(svc.rpm)} rpm`;
+      const cells = Math.round((svc.lat / slo) * 10);
+      [...row.gauge.children].forEach((c, i) => (c.className = i < Math.min(cells, 12) ? (i >= 10 ? "over" : "fill") : ""));
+      list.append(row.li); // re-append in sorted order
+    });
+    $("#contacts-hint").textContent = `${radar.services.length} services · gauge = share of the ${fmtMs(slo)} SLO`;
+  }
+
+  function renderRadarKpis() {
+    const svcs = radar.services, slo = cache.db.slo;
+    const over = svcs.filter((x) => x.lat > slo).length;
+    const lats = svcs.map((x) => x.lat).sort((a, b) => a - b);
+    const med = lats[Math.floor(lats.length / 2)];
+    const byRegion = {};
+    svcs.forEach((x) => (byRegion[x.region] = (byRegion[x.region] || 0) + x.rpm));
+    const busiest = Object.entries(byRegion).sort((a, b) => b[1] - a[1])[0];
+    const worst = svcs.slice().sort((a, b) => b.lat - a.lat)[0];
+    const tiles = [
+      ["Contacts", String(svcs.length), `${cache.db.regions.length} regions`],
+      ["Over SLO", String(over), `SLO ${fmtMs(slo)}`, over ? "bad" : ""],
+      ["Median p95", fmtMs(med), "across services"],
+      ["Slowest", fmtMs(worst.lat), `${worst.name} · ${worst.region}`],
+      ["Busiest region", busiest[0], nfCompact.format(busiest[1]) + " req / min"],
+      ["Total rate", nfCompact.format(svcs.reduce((a, x) => a + x.rpm, 0)), "req / min"],
+    ];
+    $("#radar-kpis").replaceChildren(...tiles.map(([label, value, sub, cls]) =>
+      h("div", { class: "kpi" }, h("span", { class: "label", text: label }), h("span", { class: "value " + (cls || ""), text: value }), h("span", { class: "delta", text: sub }))));
+  }
+
+  // Unit chart: each triangle is a fixed number of requests per minute.
+  function renderSignal() {
+    const box = $("#signal");
+    box.replaceChildren();
+    const byRegion = cache.db.regions.map(([name]) => ({ name, rpm: radar.services.filter((x) => x.region === name).reduce((a, x) => a + x.rpm, 0) }));
+    const max = Math.max(...byRegion.map((d) => d.rpm));
+    const raw = max / 12, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const unit = [1, 2, 5, 10].map((m) => m * p).find((u) => u >= raw);
+    $("#signal-hint").textContent = `each ▲ = ${nfCompact.format(unit)} req / min`;
+    const W = Math.max(240, box.clientWidth), colW = W / byRegion.length;
+    const stagger = colW < 72; // alternate label rows when columns are too narrow for region names
+    const th = 11, gap = 3, H = 12 * (th + gap) + 44 + (stagger ? 12 : 0);
+    const tw = Math.min(26, colW * 0.55);
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Requests per minute by region, as triangle units" }, box);
+    byRegion.forEach((d, i) => {
+      const n = Math.round(d.rpm / unit), x = colW * i + colW / 2, base = H - 22 - (stagger ? 12 : 0);
+      const g = el("g", { class: "mark" }, svg);
+      for (let k = 0; k < n; k++) {
+        const y = base - k * (th + gap);
+        el("path", { d: `M${x - tw / 2} ${y}L${x + tw / 2} ${y}L${x} ${y - th}Z`, fill: "var(--s1)" }, g);
+      }
+      el("text", { x, y: base - n * (th + gap) - 4, "text-anchor": "middle", class: "value-label" }, svg).textContent = nfCompact.format(d.rpm);
+      el("text", { x, y: H - 6 - (stagger && i % 2 === 0 ? 12 : 0), "text-anchor": "middle", class: "axis" }, svg).textContent = d.name;
+      const hit = el("rect", { x: colW * i, y: 0, width: colW, height: H, class: "hit" }, svg);
+      hit.addEventListener("pointermove", (e) => showTip(e.clientX, e.clientY, d.name, [{ color: "var(--s1)", value: nfInt.format(Math.round(d.rpm)), label: "req / min" }, { value: String(n), label: "units" }]));
+      hit.addEventListener("pointerleave", hideTip);
+    });
+  }
+
+  function logEvent(level, text) {
+    const t = new Date();
+    radar.events.unshift({ level, text, at: `${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}` });
+    radar.events.length = Math.min(radar.events.length, 14);
+    renderEvents(true);
+  }
+  function renderEvents(fresh) {
+    $("#events").replaceChildren(...radar.events.map((e, i) =>
+      h("li", { class: fresh && i === 0 ? "fresh" : "" },
+        h("span", { class: "led " + e.level }),
+        h("code", { text: e.text, title: e.text }),
+        h("span", { class: "dur", text: e.at }))));
+    const f = $("#events li.fresh");
+    if (f) setTimeout(() => f.classList.remove("fresh"), 900);
+  }
+
+  // Live mode: latencies random-walk around their base; notable changes are logged.
+  function tick() {
+    if (!radar.services.length) return;
+    const slo = cache.db.slo;
+    for (const svc of radar.services) {
+      const before = svc.lat;
+      svc.walk += (1 - svc.walk) * 0.18 + (Math.random() - 0.5) * 0.16;
+      if (Math.random() < 0.02) svc.walk *= 1.6; // occasional spike
+      svc.walk = Math.max(0.6, Math.min(2.4, svc.walk));
+      svc.lat = svc.base * svc.walk;
+      svc.rpm *= 0.97 + Math.random() * 0.06;
+      if (before <= slo && svc.lat > slo) logEvent("bad", `${svc.name} @ ${svc.region} crossed SLO: ${fmtMs(before)} → ${fmtMs(svc.lat)}`);
+      else if (before > slo && svc.lat <= slo) logEvent("", `${svc.name} @ ${svc.region} back under SLO at ${fmtMs(svc.lat)}`);
+    }
+    if (Math.random() < 0.35) {
+      const svc = radar.services[Math.floor(Math.random() * radar.services.length)];
+      const n = 1 + Math.floor(Math.random() * 6);
+      logEvent(sloState(svc)[0], Math.random() < 0.5 ? `${svc.name} @ ${svc.region} opened ${n} connection${n > 1 ? "s" : ""}` : `${svc.name} @ ${svc.region} p95 ${fmtMs(svc.lat)}, ${nfCompact.format(svc.rpm)} rpm`);
+    }
+    placeBlips();
+    updateContacts();
+    renderRadarKpis();
+  }
+  function syncLive() {
+    clearInterval(radar.timer);
+    radar.timer = null;
+    if (radar.live && !$("#radar-view").hidden && !document.hidden) radar.timer = setInterval(tick, 2500);
+  }
+  $("#live").addEventListener("change", (e) => { radar.live = e.target.checked; $("#events-hint").textContent = radar.live ? "live feed, newest first" : "paused"; syncLive(); });
+  document.addEventListener("visibilitychange", syncLive);
+
+  function renderRadar() {
+    if (!cache) return;
+    radar.services = buildServices();
+    $("#radar-sub").textContent = `${cache.db.id} · ${isoDay(state.start)} → ${isoDay(state.end)} baseline · SLO ${fmtMs(cache.db.slo)}`;
+    const legend = $("#radar-legend");
+    legend.replaceChildren(...Object.entries(KINDS).map(([k, c]) => { const r = h("i", { class: "key-rect" }); r.style.background = c; r.style.borderRadius = "50%"; return h("span", {}, r, k); }));
+    renderRadarKpis();
+    renderScope();
+    renderContacts();
+    renderSignal();
+    radar.events = [];
+    logEvent("", `scope locked on ${cache.db.id}: ${radar.services.length} services in ${cache.db.regions.length} regions`);
+    radar.services.filter((x) => x.lat > cache.db.slo).forEach((x) => logEvent("bad", `${x.name} @ ${x.region} over SLO at ${fmtMs(x.lat)}`));
+  }
+
+  /* ---------------------------------------------------------------------
+     Views: overview and radar share the filters; the hash picks the view
+     --------------------------------------------------------------------- */
+
+  function applyView() {
+    const radarOn = location.hash === "#radar";
+    $("#overview-view").hidden = radarOn;
+    $("#radar-view").hidden = !radarOn;
+    const current = radarOn ? "#radar" : ["#explorer", "#slow"].includes(location.hash) ? location.hash : "#overview";
+    document.querySelectorAll(".side-link").forEach((link) => {
+      if (link.getAttribute("href") === current) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
+    });
+    $("#compare").closest("label").hidden = radarOn;
+    if (radarOn) { renderScope(); placeBlips(); renderSignal(); window.scrollTo(0, 0); }
+    else if (location.hash && location.hash !== "#radar") { const t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
+    syncLive();
+    $("#sidebar").classList.remove("open");
+  }
+  addEventListener("hashchange", applyView);
 
   // Collapse the sidebar to an icon rail to give the dashboard more width.
   const app = $("#app"), collapseBtn = $("#collapse");
@@ -1000,4 +1335,5 @@
 
   renderConnections();
   renderAll();
+  applyView();
 })();

@@ -27,6 +27,8 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span class="txt">Explorer</span></a>
     <a class="side-link" href="#slow" title="Slow queries">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span class="txt">Slow queries</span></a>
+    <a class="side-link" href="#radar" title="Radar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 18.5 5.5"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg><span class="txt">Radar</span></a>
   </nav>
 
   <div class="side-group">
@@ -85,7 +87,8 @@
     <button class="btn primary" type="button" id="export">Export CSV</button>
   </div>
 
-  <main class="dash" id="main">
+  <main class="views" id="main">
+  <div class="dash" id="overview-view">
     <header class="page-head" id="overview">
       <h1 id="page-title">Overview</h1>
       <p id="page-sub"></p>
@@ -163,6 +166,43 @@
         <aside class="ex-detail" id="ex-detail" aria-label="Selected row"></aside>
       </div>
     </section>
+  </div>
+
+  <div class="dash" id="radar-view" hidden>
+    <header class="page-head">
+      <h1>Radar</h1>
+      <p id="radar-sub"></p>
+      <div class="head-tools">
+        <div class="legend" id="radar-legend"></div>
+        <label class="check"><input type="checkbox" id="live" checked> Live</label>
+      </div>
+    </header>
+
+    <section class="kpis radar-kpis" id="radar-kpis" aria-label="Radar summary"></section>
+
+    <section class="panel p-scope">
+      <div class="panel-head">
+        <h2>Latency scope</h2>
+        <span class="hint">distance = p95 latency (log scale) &middot; bearing = region &middot; size = requests / min</span>
+      </div>
+      <div class="panel-body scope-body"><div class="chart" id="scope"></div></div>
+    </section>
+
+    <section class="panel p-contacts">
+      <div class="panel-head"><h2>Contacts</h2><span class="hint" id="contacts-hint"></span></div>
+      <div class="panel-body flush"><ol class="contacts" id="contacts"></ol></div>
+    </section>
+
+    <section class="panel p-signal">
+      <div class="panel-head"><h2>Signal by region</h2><span class="hint" id="signal-hint"></span></div>
+      <div class="panel-body"><div class="chart" id="signal"></div></div>
+    </section>
+
+    <section class="panel p-events">
+      <div class="panel-head"><h2>Contact log</h2><span class="hint" id="events-hint">live feed, newest first</span></div>
+      <div class="panel-body flush"><ul class="log events" id="events" aria-live="polite"></ul></div>
+    </section>
+  </div>
   </main>
 </div>
 </div>
