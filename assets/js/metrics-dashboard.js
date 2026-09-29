@@ -1055,7 +1055,11 @@
     const svg = el("svg", { viewBox: `0 0 ${S} ${S}`, width: S, height: S, role: "img", "aria-label": `Latency scope: ${radar.services.length} services around ${cache.db.id}` }, box);
     svg.style.setProperty("--period", PERIOD + "s");
 
-    // Breach zone beyond the SLO ring, then range rings.
+    // Breach zone beyond the SLO ring (dithered), then range rings.
+    const defs = el("defs", {}, svg);
+    const pat = el("pattern", { id: "dither", width: 4, height: 4, patternUnits: "userSpaceOnUse" }, defs);
+    el("rect", { width: 1, height: 1, class: "dither-dot" }, pat);
+    el("rect", { x: 2, y: 2, width: 1, height: 1, class: "dither-dot" }, pat);
     const rs = rad(slo);
     el("path", { class: "scope-breach", "fill-rule": "evenodd", d: `M${cx - R} ${cy}a${R} ${R} 0 1 0 ${2 * R} 0a${R} ${R} 0 1 0 ${-2 * R} 0zM${cx - rs} ${cy}a${rs} ${rs} 0 1 1 ${2 * rs} 0a${rs} ${rs} 0 1 1 ${-2 * rs} 0z` }, svg);
     [1 / 8, 1 / 4, 1 / 2, 1, 2].forEach((f) => {
@@ -1267,7 +1271,10 @@
       svc.walk = Math.max(0.6, Math.min(2.4, svc.walk));
       svc.lat = svc.base * svc.walk;
       svc.rpm *= 0.97 + Math.random() * 0.06;
-      if (before <= slo && svc.lat > slo) logEvent("bad", `${svc.name} @ ${svc.region} crossed SLO: ${fmtMs(before)} → ${fmtMs(svc.lat)}`);
+      if (before <= slo && svc.lat > slo) {
+        logEvent("bad", `${svc.name} @ ${svc.region} crossed SLO: ${fmtMs(before)} → ${fmtMs(svc.lat)}`);
+        toast(svc, before);
+      }
       else if (before > slo && svc.lat <= slo) logEvent("", `${svc.name} @ ${svc.region} back under SLO at ${fmtMs(svc.lat)}`);
     }
     if (Math.random() < 0.35) {
@@ -1279,6 +1286,24 @@
     updateContacts();
     renderRadarKpis();
   }
+  // Alert toasts, styled as old desktop pop-up windows. At most three stay on screen.
+  function toast(svc, before) {
+    const box = $("#toasts");
+    while (box.children.length >= 3) box.firstChild.remove();
+    const close = () => node.remove();
+    const node = h("div", { class: "popup", role: "alertdialog", "aria-label": "SLO breach" },
+      h("div", { class: "popup-bar" }, h("span", { text: "SLO breach" }), h("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "✕", onclick: close })),
+      h("div", { class: "popup-body" },
+        h("span", { class: "ico", "aria-hidden": "true", text: "!" }),
+        h("p", { text: `${svc.name} @ ${svc.region} is at ${fmtMs(svc.lat)}` }),
+        h("span", { class: "sub", text: `was ${fmtMs(before)} · SLO ${fmtMs(cache.db.slo)}` }),
+        h("div", { class: "popup-actions" },
+          h("button", { class: "btn sm primary", type: "button", text: "Show", onclick: () => { setFocus(svc.id); $("#scope").scrollIntoView({ block: "center" }); close(); } }),
+          h("button", { class: "btn sm", type: "button", text: "Dismiss", onclick: close }))));
+    box.append(node);
+    setTimeout(close, 9000);
+  }
+
   function syncLive() {
     clearInterval(radar.timer);
     radar.timer = null;

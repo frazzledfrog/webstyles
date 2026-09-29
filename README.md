@@ -36,7 +36,7 @@ Header and footer markup is duplicated in each page on purpose so every file sta
 
 ## Metrics dashboard
 
-`pages/metrics-dashboard.html` is a standalone themed variant that does not use the shared tokens: it loads `assets/css/metrics.css` and `assets/js/metrics-dashboard.js` (plus `main.js` for the theme and nav toggles). The look is flat and full-width with a neon palette (cyan, violet, yellow, magenta on near-black, and a light counterpart).
+`pages/metrics-dashboard.html` is a standalone themed variant that does not use the shared tokens: it loads `assets/css/metrics.css` and `assets/js/metrics-dashboard.js` (plus `main.js` for the theme and nav toggles). The layout is flat and full-width with two moods: light "ink" (ultramarine linework on white, a solid blue sidebar, tall condensed serif titles, Y2K pop-up windows, dithered textures) and dark "night city" (acid yellow, cyan and hot red on near-black, notched corners, RGB-split titles).
 
 - Layout: a 12-column grid across the whole viewport. Charts scale with their panels, the sidebar collapses to an icon rail, and at 1400px and wider the explorer docks the row inspector beside the table.
 - Date range picker: presets plus a two-month custom calendar (keyboard arrows move between days).

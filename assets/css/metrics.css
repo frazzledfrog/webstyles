@@ -1,46 +1,65 @@
 /* ==========================================================================
-   Metrics dashboard theme: flat, full-bleed, neon-on-night palette.
-   Self-contained: load this instead of tokens/base/components. Works with
-   main.js for the theme and nav toggles.
+   Metrics dashboard theme. Self-contained: load this instead of
+   tokens/base/components. Works with main.js for the theme and nav toggles.
 
-   Rules of the look:
-   - flat: 1px hairlines separate surfaces; no shadows, glows or gradients
-   - full width: a 12-column grid spans the whole viewport, charts grow with
-     their panels, the explorer docks a row inspector beside the table
-   - neon: cyan for interaction, magenta for focus and emphasis; the chart
-     series (cyan, violet, yellow, magenta) are validated for colour-vision
-     deficiency in both themes
+   Two moods, one system:
+   - light "ink": ultramarine linework on white paper, a solid blue sidebar,
+     tall condensed serif titles, Y2K pop-up windows, dithered textures
+   - dark "night city": near-black with acid yellow for interaction, cyan for
+     focus, hot red for alerts, notched panel corners, RGB-split glitch on titles
+   Layout stays flat and full-bleed: a 12-column grid across the viewport.
+   Chart series are validated for colour-vision deficiency in both themes
+   (light: ultramarine, teal, ochre, magenta; dark: cyan, violet, yellow, magenta).
    ========================================================================== */
 
 :root {
-  /* Light */
-  --bg: #f3f3f8;
+  /* Light: ink on paper */
+  --bg: #f1f2fb;
   --surface: #ffffff;
-  --surface-2: #ececf4;
-  --line: #dcdce8;
-  --line-strong: #b9b9cc;
-  --text: #0c0c18;
-  --text-muted: #62627a;
+  --surface-2: #e8eafc;
+  --line: #cfd2f4;
+  --line-strong: #7f84e6;
+  --text: #11136b;
+  --text-muted: #5a5ea6;
 
-  --accent: #007f99;
+  --accent: #2b30d9;
   --accent-ink: #ffffff;
-  --accent-soft: #dff4f8;
-  --pop: #c4119a;
+  --accent-soft: #e2e4ff;
+  --pop: #e0103a;
+  --glitch-a: transparent;
+  --glitch-b: transparent;
 
-  --s1: #0089a3;
-  --s2: #6b3df2;
-  --s3: #7d7100;
-  --s4: #c4119a;
-  --s-prev: #9a9ab0;
-  --seq-lo: #eef0f7;
-  --seq-hi: #006a80;
+  --side-bg: #2b30d9;
+  --side-text: #ffffff;
+  --side-muted: #b9bcff;
+  --side-line: #4d52e8;
+  --side-hover: #3a3fe6;
+  --side-active-bg: #ffffff;
+  --side-active-text: #2b30d9;
+
+  /* Y2K pop-up window chrome */
+  --win-title: linear-gradient(180deg, #4f6bff 0%, #2b30d9 55%, #1d22b8 100%);
+  --win-title-text: #ffffff;
+  --win-frame: #2b30d9;
+
+  --s1: #2b30d9;
+  --s2: #0e8a7a;
+  --s3: #8a6d00;
+  --s4: #c2187a;
+  --s-prev: #9a9dce;
+  --seq-lo: #eceeff;
+  --seq-hi: #1f23c4;
+  --dither: #2b30d9;
 
   --good: #0f8a4f;
   --warn: #b35c00;
-  --bad: #d11a3c;
+  --bad: #e0103a;
+
+  --scanline: transparent;
 
   --font-ui: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-display: "Chakra Petch", "JetBrains Mono", ui-monospace, sans-serif;
+  --font-title: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
 
   --fs-2xs: 0.625rem;
   --fs-xs: 0.6875rem;
@@ -51,6 +70,7 @@
 
   --gap: 12px;
   --pad: 16px;
+  --notch: 12px;
   --sidebar-w: 216px;
   --rail-w: 56px;
   --topbar-h: 52px;
@@ -62,17 +82,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #07070d;
-    --surface: #0e0e18;
-    --surface-2: #151524;
-    --line: #1f1f33;
-    --line-strong: #34344f;
-    --text: #e8e8f5;
-    --text-muted: #7d7d9c;
-    --accent: #00e5ff;
-    --accent-ink: #03161a;
-    --accent-soft: #062a33;
-    --pop: #ff2bd6;
+    --bg: #07070b;
+    --surface: #0d0d14;
+    --surface-2: #16161f;
+    --line: #26263a;
+    --line-strong: #45455f;
+    --text: #ecebf2;
+    --text-muted: #8a89a3;
+    --accent: #fcee0a;
+    --accent-ink: #0a0a0a;
+    --accent-soft: #2a2706;
+    --pop: #00f0ff;
+    --glitch-a: rgb(0 240 255 / 0.55);
+    --glitch-b: rgb(255 0 60 / 0.55);
+    --side-bg: #0d0d14;
+    --side-text: #ecebf2;
+    --side-muted: #8a89a3;
+    --side-line: #26263a;
+    --side-hover: #16161f;
+    --side-active-bg: #fcee0a;
+    --side-active-text: #0a0a0a;
+    --win-title: linear-gradient(180deg, #3d52ff 0%, #2327c9 60%, #171a96 100%);
+    --win-title-text: #ffffff;
+    --win-frame: #3d52ff;
     --s1: #00a3bd;
     --s2: #8466ff;
     --s3: #a39500;
@@ -80,24 +112,38 @@
     --s-prev: #4a4a66;
     --seq-lo: #12121f;
     --seq-hi: #00e5ff;
+    --dither: #fcee0a;
     --good: #2ee88f;
     --warn: #ff9f1a;
-    --bad: #ff3b5c;
+    --bad: #ff003c;
+    --scanline: rgb(255 255 255 / 0.018);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #07070d;
-  --surface: #0e0e18;
-  --surface-2: #151524;
-  --line: #1f1f33;
-  --line-strong: #34344f;
-  --text: #e8e8f5;
-  --text-muted: #7d7d9c;
-  --accent: #00e5ff;
-  --accent-ink: #03161a;
-  --accent-soft: #062a33;
-  --pop: #ff2bd6;
+  --bg: #07070b;
+  --surface: #0d0d14;
+  --surface-2: #16161f;
+  --line: #26263a;
+  --line-strong: #45455f;
+  --text: #ecebf2;
+  --text-muted: #8a89a3;
+  --accent: #fcee0a;
+  --accent-ink: #0a0a0a;
+  --accent-soft: #2a2706;
+  --pop: #00f0ff;
+  --glitch-a: rgb(0 240 255 / 0.55);
+  --glitch-b: rgb(255 0 60 / 0.55);
+  --side-bg: #0d0d14;
+  --side-text: #ecebf2;
+  --side-muted: #8a89a3;
+  --side-line: #26263a;
+  --side-hover: #16161f;
+  --side-active-bg: #fcee0a;
+  --side-active-text: #0a0a0a;
+  --win-title: linear-gradient(180deg, #3d52ff 0%, #2327c9 60%, #171a96 100%);
+  --win-title-text: #ffffff;
+  --win-frame: #3d52ff;
   --s1: #00a3bd;
   --s2: #8466ff;
   --s3: #a39500;
@@ -105,9 +151,11 @@
   --s-prev: #4a4a66;
   --seq-lo: #12121f;
   --seq-hi: #00e5ff;
+  --dither: #fcee0a;
   --good: #2ee88f;
   --warn: #ff9f1a;
-  --bad: #ff3b5c;
+  --bad: #ff003c;
+  --scanline: rgb(255 255 255 / 0.018);
   color-scheme: dark;
 }
 
@@ -478,7 +526,8 @@ dialog.inspector::backdrop { background: rgb(0 0 0 / 0.5); }
 #scope svg { max-width: 100%; }
 .scope-ring { fill: none; stroke: var(--line); }
 .scope-ring.slo { stroke: var(--bad); stroke-dasharray: 4 4; }
-.scope-breach { fill: var(--bad); fill-opacity: 0.06; }
+.scope-breach { fill: url(#dither); }
+.dither-dot { fill: var(--bad); fill-opacity: 0.55; }
 .scope-spoke { stroke: var(--line); }
 .scope-tick { stroke: var(--line-strong); }
 .scope-sweep { transform-box: view-box; animation: sweep var(--period, 6s) linear infinite; }
@@ -517,6 +566,86 @@ dialog.inspector::backdrop { background: rgb(0 0 0 / 0.5); }
 
 .events li { transition: background 600ms; }
 .events li.fresh { background: var(--accent-soft); }
+
+/* Mood layer: ink / night-city treatments on top of the flat base -------- */
+
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 400; pointer-events: none;
+  background: repeating-linear-gradient(0deg, var(--scanline) 0 1px, transparent 1px 3px);
+}
+
+/* Sidebar: a solid ultramarine slab in ink, black with yellow in night city. */
+.sidebar { background: var(--side-bg); color: var(--side-text); border-right-color: var(--side-line); }
+.brand { border-bottom-color: var(--side-line); }
+.brand-mark { background: linear-gradient(135deg, var(--side-active-bg) 50%, var(--pop) 50%); }
+.brand small, .side-group h2, .conn .meta { color: var(--side-muted); }
+.side-link, .side-collapse { color: var(--side-muted); }
+.side-link:hover, .side-collapse:hover, .conn:hover { color: var(--side-text); background: var(--side-hover); }
+.side-link[aria-current="page"] { color: var(--side-active-text); background: var(--side-active-bg); font-weight: 700; }
+.conn[aria-pressed="true"] { border-color: var(--side-muted); }
+.conn[aria-pressed="true"] .name { color: var(--side-text); }
+
+/* Titles: tall condensed serif, with an RGB split in night city. */
+.page-head h1 {
+  font-family: var(--font-title); font-weight: 700; font-size: 2.1rem; line-height: 1;
+  display: inline-block; transform: scaleY(1.5); transform-origin: left bottom;
+  padding-top: 0.5em; letter-spacing: -0.01em;
+  text-shadow: 2px 0 var(--glitch-a), -2px 0 var(--glitch-b);
+}
+/* Dithered band under the title, fading out to the right. */
+.page-head::after {
+  content: ""; flex-basis: 100%; height: 6px; opacity: 0.55;
+  background: repeating-conic-gradient(var(--dither) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 70%); mask-image: linear-gradient(90deg, #000 0%, transparent 70%);
+}
+
+/* Notched corners on panels and tiles, with the cut edge drawn in. */
+.panel, .kpi {
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch)));
+}
+.panel::after, .kpi::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to bottom left, transparent calc(50% - 0.75px), var(--line) calc(50% - 0.75px), var(--line) calc(50% + 0.75px), transparent calc(50% + 0.75px)) top right / var(--notch) var(--notch) no-repeat,
+    linear-gradient(to bottom left, transparent calc(50% - 0.75px), var(--line) calc(50% - 0.75px), var(--line) calc(50% + 0.75px), transparent calc(50% + 0.75px)) bottom left / var(--notch) var(--notch) no-repeat;
+}
+.panel-head h2::before { content: "// "; color: var(--accent); }
+.kpi .label::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: var(--accent); vertical-align: 1px; }
+
+.btn.primary { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); font-weight: 700; letter-spacing: 0.04em; }
+.btn.primary:hover { text-shadow: 1px 0 var(--pop), -1px 0 var(--bad); }
+
+/* Y2K pop-up window chrome: tooltips, the row inspector and alert toasts. */
+.tooltip { border: 1px solid var(--win-frame); border-radius: 5px 5px 2px 2px; box-shadow: 3px 3px 0 rgb(0 0 0 / 0.22); padding: 0 10px 8px; overflow: hidden; }
+.tooltip .tt-title {
+  margin: 0 -10px 6px; padding: 3px 10px;
+  background: var(--win-title); color: var(--win-title-text); font-weight: 700;
+}
+dialog.inspector .panel-head { background: var(--win-title); color: var(--win-title-text); border-bottom-color: var(--win-frame); }
+dialog.inspector .panel-head h2::before { content: none; }
+dialog.inspector .btn { background: transparent; color: var(--win-title-text); border-color: rgb(255 255 255 / 0.6); }
+
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 160; display: grid; gap: 10px; width: min(300px, calc(100vw - 32px)); }
+.popup {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--win-frame); border-radius: 7px 7px 3px 3px; overflow: hidden;
+  box-shadow: 4px 4px 0 rgb(0 0 0 / 0.25);
+  animation: pop-in 180ms ease-out;
+}
+.popup-bar {
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px;
+  background: var(--win-title); color: var(--win-title-text);
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.02em;
+}
+.popup-bar .x { margin-left: auto; width: 20px; height: 18px; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 0.7); border-radius: 3px; background: rgb(255 255 255 / 0.12); color: inherit; font-size: 10px; line-height: 1; }
+.popup-bar .x:hover { background: var(--bad); }
+.popup-body { display: grid; grid-template-columns: 22px 1fr; gap: 4px 10px; padding: 10px 12px 12px; font-size: var(--fs-xs); }
+.popup-body .ico { width: 22px; height: 22px; display: grid; place-items: center; background: var(--bad); color: #fff; font-weight: 800; clip-path: polygon(50% 0, 100% 100%, 0 100%); padding-top: 6px; font-size: 11px; }
+.popup-body p { margin: 0; }
+.popup-body .sub { grid-column: 2; color: var(--text-muted); font-size: var(--fs-2xs); }
+.popup-actions { grid-column: 2; display: flex; gap: 6px; margin-top: 6px; }
+@keyframes pop-in { from { transform: translateY(12px); opacity: 0; } }
 
 /* Responsive ------------------------------------------------------------- */
 
